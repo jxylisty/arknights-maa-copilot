@@ -53,6 +53,49 @@ def ocr_region(pil_img, box, scale=2):
     return ocr_image(pil_img.crop(box), scale)
 
 
+async def _ocr_lines(png_bytes):
+    st = InMemoryRandomAccessStream()
+    w = DataWriter(st.get_output_stream_at(0))
+    w.write_bytes(png_bytes)
+    await w.store_async()
+    await w.flush_async()
+    st.seek(0)
+    dec = await BitmapDecoder.create_async(st)
+    bmp = await dec.get_software_bitmap_async()
+    eng = _engine()
+    if eng is None:
+        return []
+    res = await eng.recognize_async(bmp)
+    return res.lines
+
+
+def ocr_text_lines(pil_img, scale=2):
+    """OCR returning [(text, cx, cy, x0, y0, x1, y1), ...] in image pixels.
+
+    Coordinates are scaled back to the ORIGINAL image, so callers can tap them
+    directly. This is what makes "find the button with the weird name" possible:
+    locate the label, tap its centre, then check what screen you landed on.
+    """
+    if scale != 1:
+        pil_img = pil_img.resize(
+            (pil_img.width * scale, pil_img.height * scale), Image.LANCZOS)
+    buf = io.BytesIO()
+    pil_img.save(buf, format="PNG")
+
+    out = []
+    for line in asyncio.run(_ocr_lines(buf.getvalue())):
+        words = list(line.words)
+        if not words:
+            continue
+        x0 = min(w.bounding_rect.x for w in words) / scale
+        y0 = min(w.bounding_rect.y for w in words) / scale
+        x1 = max(w.bounding_rect.x + w.bounding_rect.width for w in words) / scale
+        y1 = max(w.bounding_rect.y + w.bounding_rect.height for w in words) / scale
+        out.append((line.text, int((x0 + x1) / 2), int((y0 + y1) / 2),
+                    int(x0), int(y0), int(x1), int(y1)))
+    return out
+
+
 def norm(txt):
     """Collapse whitespace: OCR likes to space out CJK and split tokens."""
     return (txt or "").replace(" ", "").replace("\n", "")
