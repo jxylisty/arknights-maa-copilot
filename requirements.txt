@@ -1,0 +1,12 @@
+# MAA GUI 自动化
+pywinauto>=0.6.8
+pywin32>=306
+
+# 截图处理
+pillow>=10.0
+
+# 屏幕 OCR（Windows.Media.Ocr，无需外部二进制）
+winrt-Windows.Media.Ocr
+winrt-Windows.Graphics.Imaging
+winrt-Windows.Storage.Streams
+winrt-Windows.Globalization

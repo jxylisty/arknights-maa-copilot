@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.DS_Store
+Thumbs.db
+
+# 本地跑出来的截图 / 临时作业
+*.png
+shots/
