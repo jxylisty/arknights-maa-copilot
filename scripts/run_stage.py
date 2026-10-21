@@ -50,7 +50,8 @@ def run(job_id, name, verify=True, timeout=480, borrow=False, renames=None,
             print(f"  raised elite to real value for: {fixed}")
     path = game.save_job(cop, name)
 
-    w = M.focus()
+    # no focus(): every mutating UIA call restores the foreground itself
+    w = M.win()
     if not M.tab_click(w, "作业"):
         return False, "copilot tab not found"
     time.sleep(0.8)

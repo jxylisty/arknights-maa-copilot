@@ -102,6 +102,38 @@ https://prts.maa.plus/copilot/query?levelKeyword=act3break_09&page=1&limit=40&de
 
 走 pywinauto 的 UIA backend 操作 WPF 控件（不要改 `gui.json`，MAA 退出时会覆写）。
 
+#### 不抢焦点：后台驱动 MAA
+
+**脚本全程不需要把 MAA 置前**，你可以继续在别的窗口干活。这是实测结论：
+
+| 操作 | 抢焦点？ | 说明 |
+|---|---|---|
+| 读控件（`element_info` / `window_text` / `get_toggle_state`） | 否 | 纯 UIA 读 |
+| `iface_value.SetValue`（填路径框） | 否 | 替代 `send_keys`，不经过键盘队列 |
+| UIA `Toggle` / `Invoke`（勾选框、按钮） | **是** | WPF 控件自己调 `Focus()`，绕不开 |
+| 填 `prts://` 后 MAA 载入作业集 | **是** | MAA 内部行为，会激活自己的窗口 |
+
+所以策略是「操作完立刻把焦点还回去」：`keep_focus()` 上下文管理器先快照前台窗口，
+操作结束后用 `AttachThreadInput` 绕过系统的前台锁把焦点还回原窗口。
+
+```python
+with M.keep_focus():
+    M.set_path(w, "prts://s55511", settle=3.0)   # settle 等 MAA 抓完作业集
+```
+
+**不要用 `send_keys()` 输入文字**——它往当前有焦点的窗口打字，会打断用户输入，
+而且必须先置前。路径框用 `ValuePattern.SetValue`，实测 MAA 的 TextChanged 会正常触发。
+
+**不要用 PostMessage 点击**。MAA 是 WPF，WPF 不处理 `WM_LBUTTONDOWN`，
+PostMessage 打到复选框上会被静默丢弃（已实测确认无效）。UIA 才是受支持的路子。
+
+#### 其余 UIA 坑
+
+- `CheckBox.click_input()` 常常**不翻转** WPF 的 toggle（模板吞掉了事件）。用 `el.toggle()`
+- 「开始」按钮用 UIA `invoke()` 而不是 `click_input()`：后者会移动真实鼠标，模拟器挡住 MAA 时点空
+- 作业页的 Tab 文字是**「自动战斗」**不是「作业」；`el.select()` 会静默失败，要用 `iface_selection_item.Select()`
+- 作业列表是虚拟化的，`descendants()` 会返回视口外的行（坐标是负的或极大），不能靠坐标判断可见性
+
 ```python
 w = M.focus()
 M.tab_click(w, "作业")
