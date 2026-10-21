@@ -1,16 +1,24 @@
 # arknights-maa-copilot
 
-用 MAA 抄作业自动通关明日方舟活动关。**专治 MAA 没做导航适配的活动**——这类活动一点「开始」就报「未找到关卡」，MAA 的 Copilot 再强也用不上。
+用 MAA 抄作业自动通关明日方舟**年度高难活动**（矢量突破 / 拟生态：VEC 编号 + 特别战线 + 补给驻防）。
 
-思路是把职责拆开：**人（或 adb 脚本）负责把关卡点到「开始行动」界面，MAA 只负责自动编队 + 按作业 JSON 打这一关**。
+配套 skill：[arknights-sidestory](https://github.com/jxylisty/arknights-sidestory) 管**月度 SideStory 活动**，那边是作业集 + 多作业模式连打。
+
+## 为什么需要它
+
+MAA 的 Copilot 功能很强，但**它不会帮你导航到关卡**。矢量突破的选关界面是 VEC 专属的堆叠 UI 加 4×4 特别战线网格，MAA 完全没做适配，一点「开始」就报「未找到关卡」。
+
+思路是把职责拆开：**adb 把关卡点到「开始行动」界面，MAA 只负责自动编队 + 按作业 JSON 打这一关**。
 
 ## 能做什么
 
 - 从 [prts.plus](https://prts.plus) 按关卡搜作业，并按你的干员库排序可行性
 - 驱动 MAA 的 WPF GUI（UI Automation），不用手点
 - 自动修补作业 JSON：异格干员改名、elite 要求冲突、干员组替换
-- 自动找新活动：活动表、关卡代码前缀、作业集（`prts://s<id>`）
+- 特别战线的补给/驻防配置（像素判色，不依赖 OCR）
 - adb 截图 + OCR 验收战果，不依赖 MAA 日志的「任务链完成」
+
+这些脚本也被 `arknights-sidestory` 复用，所以修一次两个 skill 一起生效。
 
 ## 环境
 
@@ -45,10 +53,11 @@ python run_stage.py VEC-A --job 105819 --supplies 极化,净血,拮抗,消杀,�
 找新活动：
 
 ```bash
-python copilot_api.py --acts            # 当前还在开的活动 + 关卡代码
-python copilot_api.py --sets 昨日海      # 搜作业集
-python copilot_api.py --set 55511       # 展开作业集，看覆盖了哪些关
+python copilot_api.py --acts            # 当前开着的 SideStory + 关卡代码
+python copilot_api.py --sets 昨日海      # 搜作业集（SideStory 用，见另一个 skill）
 ```
+
+矢量突破这类高难活动**不在**活动表里——它一年一次、时间不固定，得自己去终端页找。
 
 ## 关键坑（都是实际踩过的）
 
@@ -92,7 +101,9 @@ data/
 
 ## 状态
 
-已验证通关：「拟生态」（矢量突破 #3）VEC-01~12 + A/B/C/D + SP01~SP16，「昨日海」YW-EX-1~8 普通 + 全部突袭。
+本 skill 侧已验证通关：「拟生态」（矢量突破 #3）VEC-01~12 + A/B/C/D + SP01~SP16。
+
+月度 SideStory 部分（「昨日海」YW-EX-1~8 普通 + 全部突袭）已迁到 `arknights-sidestory`。
 
 ## 免责
 
