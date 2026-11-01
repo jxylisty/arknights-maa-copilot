@@ -98,7 +98,7 @@ python run_stage.py VEC-A --job 105819 --supplies 极化,净血,拮抗,消杀,�
 | `game.py` | 关卡识别、验收、作业 JSON 保存/修补/改名、补给开关 |
 | `nav.py` | 关卡导航（VEC） |
 | `run_stage.py` | 一键：选作业 → 配补给 → 开打 → 验收 |
-| `ark_mcp.py` | MCP 服务器：`screen`/`tap(expect护栏)`/`swipe`/`back`/`copilot_search`/`battle_wait`/`paradox_run`/`maa_status`/`annihilation_run`(全权委托扫荡)/`annihilation_collect`(结算解析)，已注册进 ZCode（`~/.zcode/cli/config.json` → mcp.servers） |
+| `ark_mcp.py` | MCP 服务器：`screen`/`tap(expect护栏)`/`swipe`/`back`/`copilot_search`/`battle_wait`/`skip_story`(跳强插剧情)/`copilot_clear_list`(⊗清空作业列表)/`copilot_uncheck`(按前缀取消勾选)/`copilot_run_checked`(校验勾选后开打)/`paradox_run`/`maa_status`/`annihilation_run`(全权委托扫荡)/`annihilation_collect`(结算解析)，已注册进 ZCode（`~/.zcode/cli/config.json` → mcp.servers） |
 | `data/rarity.json` | 干员→星级 |
 | `data/stage_map.json` | 显示编号→stage id |
 | `data/mem_jobs.json` | mem_ 悖论作业缓存（MCP 生成，24h 过期） |
@@ -120,4 +120,15 @@ python run_stage.py VEC-A --job 105819 --supplies 极化,净血,拮抗,消杀,�
   前置：游戏停在剿灭地图页（OCR 可见「剿灭委托」）；`confirm=false` 只弹确认框读收益预览。
   详见 references/annihilation.md §全权委托扫荡。
 - `maa_status`：MAA 窗口/勾选框/日志尾只读自检，跑需要 MAA 的流程前先调它。
+- **SideStory 多作业四件套**（2026-11「时间啊，向前！」4 小时实战沉淀，详见
+  arknights-sidestory skill 的战报章节）：
+  - `skip_story(max_pages=4)`：跳过强插剧情页。SideStory 每关之间会塞「自动 OFF」的
+    剧情，MAA 不认识它，会在背后干滑 ~20 分钟后报 `战斗出错`（实际一场没打）。
+    看到 copilot 超时先 `screen` 确认是不是剧情页，是就调它。也顺带关掉残留结算页。
+  - `copilot_clear_list()`：列表右下角红色 ⊗ 一键清空（逐行删是下策：UIA 视口外
+    点击无效 + 状态读回会撒谎）。清完重新导入作业集。
+  - `copilot_uncheck(prefix)`：按前缀取消勾选（旧活动关卡全通关后清场用）。
+    UIA toggle 后重读可能还是旧值，以 `maa_status` 的 checkboxes 为准。
+  - `copilot_run_checked("TL-8,TL-9")`：开打前断言勾选的行与预期完全一致，
+    防止带着旧勾选/漏勾启动；返回 log_offset 供 `maa_status` 轮询。
 - 环境变量 `MAA_DIR`/`MAA_ADB`/`MAA_SERIAL` 对 MCP 进程同样生效。
