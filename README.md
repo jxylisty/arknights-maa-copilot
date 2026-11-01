@@ -1,110 +1,79 @@
 # arknights-maa-copilot
 
-用 MAA 抄作业自动通关明日方舟**年度高难活动**（矢量突破 / 拟生态：VEC 编号 + 特别战线 + 补给驻防）。
+> **起因**：我太懒，不想玩明日方舟，但周常奖励又不能不领。
+> 于是我让 AI 自己去玩。这两个仓库，就是它玩着玩着长出来的肌肉记忆。
 
-配套 skill：[arknights-sidestory](https://github.com/jxylisty/arknights-sidestory) 管**月度 SideStory 活动**，那边是作业集 + 多作业模式连打。
+让 AI（ZCode agent）替我打活动关。思路一句话：**MAA 的仗打得很好，但它不认路**——
+所以 AI 负责把路点出来，MAA 只管编队和开打。剩下的一切（找作业、验尸、领奖励、扫荡）
+AI 自己用 adb + OCR 一路摸黑学会了。
 
-## 为什么需要它
+配套仓库：[arknights-sidestory](https://github.com/jxylisty/arknights-sidestory)
+管月度 SideStory 连打。两个 skill 共用底层脚本，修一处两边生效。
 
-MAA 的 Copilot 功能很强，但**它不会帮你导航到关卡**。矢量突破的选关界面是 VEC 专属的堆叠 UI 加 4×4 特别战线网格，MAA 完全没做适配，一点「开始」就报「未找到关卡」。
+## 它现在会什么
 
-思路是把职责拆开：**adb 把关卡点到「开始行动」界面，MAA 只负责自动编队 + 按作业 JSON 打这一关**。
+| 玩法 | 战绩 | 打法 |
+|---|---|---|
+| 年度高难（矢量突破/拟生态 VEC-01~12 + A~D + SP01~16） | 「拟生态」#3 全通 | AI 点导航 → MAA 抄作业 → OCR 验收 |
+| 每周剿灭 | 每周 400 满歼 | 首通 MAA 抄作业；之后游戏自带**全权委托**秒结算 |
+| 悖论模拟 | 已清 | 停在技能弹窗，一个工具全包（含重试） |
+| MCP 服务器 | 10 个工具 | AI 的手：截图 / 点屏幕 / 驱动 MAA / 跑扫荡 |
 
-## 能做什么
-
-- 从 [prts.plus](https://prts.plus) 按关卡搜作业，并按你的干员库排序可行性
-- 驱动 MAA 的 WPF GUI（UI Automation），不用手点
-- 自动修补作业 JSON：异格干员改名、elite 要求冲突、干员组替换
-- 特别战线的补给/驻防配置（像素判色，不依赖 OCR）
-- adb 截图 + OCR 验收战果，不依赖 MAA 日志的「任务链完成」
-
-这些脚本也被 `arknights-sidestory` 复用，所以修一次两个 skill 一起生效。
-
-## 环境
-
-- Windows（MAA 是 WPF 应用，UI Automation 与 `Windows.Media.Ocr` 都是 Windows 专有）
-- MAA 在跑，且已连上模拟器；模拟器分辨率 **1920×1080 横屏**（所有坐标按此标定）
-- Python 3.10+
-
-```bash
-pip install -r requirements.txt
-```
-
-路径通过环境变量覆盖，默认值见 `scripts/config.py`：
-
-| 变量 | 默认 |
-|---|---|
-| `MAA_DIR` | `E:\C盘搬家\工具包\MAA-v5.12.3-win-x64` |
-| `MAA_ADB` | `$MAA_DIR/adb/platform-tools/adb.exe` |
-| `MAA_SERIAL` | `127.0.0.1:16384` |
+剿灭这段最好玩：首通之后游戏允许看 25 分钟的「代理指挥录像」重放——结果完全一样。
+AI 实测后把这条路判了死刑，改用游戏自带的全权委托（一张代理卡秒结算、不扣理智），
+扫荡流程自动化到 10 秒一轮。
 
 ## 快速开始
 
 ```bash
+pip install -r requirements.txt
 cd scripts
 
-python nav.py --where              # 游戏现在停在哪一关
-python nav.py VEC-09               # 把选关器走到目标关（游戏内线性解锁）
-python run_stage.py VEC-09 --dry   # 只看作业排名，不打
+python nav.py --where              # 游戏现在停在哪
+python nav.py VEC-09               # 把选关器走到目标关
 python run_stage.py VEC-09         # 挑最优作业并开打 + 验收
-python run_stage.py VEC-A --job 105819 --supplies 极化,净血,拮抗,消杀,缴械,催化
+
+# 每周剿灭扫荡（游戏停在剿灭地图页时，10 秒完事）
+python -c "import annihilation as AN; print(AN.run_delegation())"
+
+# MCP 服务器（ZCode/其他宿主自动连）
+python ark_mcp.py
 ```
 
-找新活动：
+环境：Windows（UIA 与 Windows OCR 都是 Windows 专有）+ MAA 在跑且连着模拟器 +
+**1920×1080 横屏**（所有坐标按此标定）+ Python 3.10+。路径可用环境变量覆盖，
+默认值见 `scripts/config.py`。
 
-```bash
-python copilot_api.py --acts            # 当前开着的 SideStory + 关卡代码
-python copilot_api.py --sets 昨日海      # 搜作业集（SideStory 用，见另一个 skill）
-```
+## 学费清单（精选；全价版在 references/）
 
-矢量突破这类高难活动**不在**活动表里——它一年一次、时间不固定，得自己去终端页找。
-
-## 关键坑（都是实际踩过的）
-
-**MAA 侧**
-
-- 复选框必须用 `TogglePattern.toggle()`，`click_input()` 不会翻转 WPF 的 CheckBox
-- 「开始」按钮要用 UIA `invoke()`：`click_input()` 会移动真实鼠标，模拟器挡住 MAA 时点空
-- 作业页的 Tab 文字是**「自动战斗」**不是「作业」；`select()` 会静默失败，要用 `iface_selection_item.Select()`
-- 作业列表是虚拟化的，`descendants()` 只返回可见的十几行，滚轮必须落在列表区域上
-
-**作业 JSON 侧**
-
-- 搜作业的参数是 `levelKeyword`，`keyword` / `search` 会被静默忽略
-- `requirements.elite` **不能低于**干员实际精英化等级，否则 MAA 直接 `CopilotFileReadError`
-- 但**也不能全组一刀切提到 E2**——低星挂件会变成「精英化不足」，卡在选人页
-- `groups[].opers` 是任选其一；`actions[].name` 里还会出现**组名**，把它当干员名查会误判缺人
-
-**验收侧**
-
-- 胜利画面的标题是 `行动结束 / MISSION RESULTS`，**不是** `MISSION COMPLETED`
-- 而且这行大字只能靠**裁剪区域** OCR 读到，全屏读不出来
-- 战斗失败时日志里**同时**有「任务出错」和「完成任务: 自动战斗」，只查后者会把失败判成成功
+- MAA 的 CheckBox 要用 `TogglePattern.toggle()`，`click_input()` 静默无效；
+  「开始」按钮要用 UIA `invoke()`，不然真实鼠标点到模拟器上、MAA 永远不开始
+- 作业 JSON 的 `requirements.elite` 低了直接拒载（`CopilotFileReadError`），
+  全组一刀切拔高又会让低星挂件卡死选人页——按报错逐个改
+- 胜利判定要裁剪区域 OCR「行动结束」；失败时 MAA 日志**同时**有「任务出错」和
+  「完成任务: 自动战斗」，只看完成行会把败仗当胜利
+- prts 作业的**标题会瞎写**（有份剿灭作业标题叫「卫戍协议:盟约」）——
+  选作业只认 `stage_name`，进游戏前先确认模式入口真的存在
+- MAA 退出时会用当前界面状态覆写 gui.json：动它的勾选框之前先存原状，测完恢复
+- 对游戏未知界面，**一 tap 一截图**：AI 曾把「按钮数量抖动」当进度死循环重试，
+  正确姿势是盯资产变化（龙门币/合成玉跳没跳）
 
 ## 仓库结构
 
 ```
-SKILL.md                 完整的实战手册（给 agent 读的）
+SKILL.md                 实战手册（给 agent 读的）
 scripts/
-  config.py              路径与常量（环境变量可覆盖）
-  adb.py                 截图 / tap / swipe / back
-  winocr.py              Windows OCR 封装 + 文本归一化
-  copilot_api.py         作业站 API、干员库匹配、作业排名、作业集、活动表
+  config.py adb.py winocr.py
+  copilot_api.py         作业站 API、干员库匹配、排名
   maa_drive.py           MAA GUI（UIA）驱动、日志等待
-  game.py                关卡识别、验收、作业修补、elite 预检、补给开关
-  nav.py                 关卡导航
-  run_stage.py           一键：选作业 → 预检 → 配补给 → 开打 → 验收
-data/
-  rarity.json            干员 → 星级
-  stage_map.json         显示编号 → stage id
+  game.py nav.py run_stage.py
+  annihilation.py        每周剿灭：MAA 首通 + 全权委托扫荡
+  ark_mcp.py             MCP 服务器（10 工具）
+data/                    干员星级 / stage map / 悖论作业缓存
+references/              vec-annual / annihilation / paradox / maa-pitfalls / daily
 ```
-
-## 状态
-
-本 skill 侧已验证通关：「拟生态」（矢量突破 #3）VEC-01~12 + A/B/C/D + SP01~SP16。
-
-月度 SideStory 部分（「昨日海」YW-EX-1~8 普通 + 全部突袭）已迁到 `arknights-sidestory`。
 
 ## 免责
 
 仅供个人自动化学习使用。作业 JSON 版权归 prts.plus 原作者。
+打游戏的是 AI，账号是本人的——理智掉了会哭，请勿用于商业用途。
