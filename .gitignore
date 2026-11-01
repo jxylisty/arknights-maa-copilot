@@ -9,3 +9,4 @@ Thumbs.db
 # 本地跑出来的截图 / 临时作业
 *.png
 shots/
+data/mem_jobs.json
