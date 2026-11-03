@@ -217,6 +217,27 @@ def _path_box(w, timeout=6.0):
         time.sleep(0.4)
 
 
+def _path_box_wait_enabled(w, timeout=25.0):
+    """Wait for the path box to exist AND be enabled.
+
+    Right after MAA launches it auto-connects to the emulator and disables
+    its UI; every SetValue/set_text on a disabled WPF TextBox raises
+    (ElementNotEnabled / COMError), so callers must wait the startup out.
+    """
+    t0 = time.time()
+    while True:
+        box = _path_box(w)
+        if box is not None:
+            try:
+                if box.enabled():
+                    return box
+            except Exception:
+                pass
+        if time.time() - t0 >= timeout:
+            return box  # let the caller's error path report it
+        time.sleep(1.0)
+
+
 def set_path(w, path, settle=0.0):
     """Put a path (or prts:// code) into the FileTreeBox.
 
@@ -231,22 +252,38 @@ def set_path(w, path, settle=0.0):
     the foreground should pass settle>0 and let keep_focus() restore it after
     the fetch settles.
     """
-    box = _path_box(w)
+    box = _path_box_wait_enabled(w)
     if box is None:
         raise RuntimeError("FileTreeBox TextBox not found")
     if box.window_text() == path:
-        return True
-    try:
-        box.iface_value.SetValue(path)
-    except Exception:
-        # fallback for a future MAA that drops ValuePattern from this control
-        with keep_focus():
-            box.click_input()
-            time.sleep(0.3)
-            from pywinauto.keyboard import send_keys
-            send_keys("^a")
-            send_keys("{DELETE}")
-            box.set_text(path)
+        # Same path already in the box (e.g. a previous run wrote it but the
+        # file failed to load, or MAA restored it from its own config after a
+        # restart while the job list is empty). SetValue would be a no-op for
+        # MAA's TextChanged handler, leaving 未选择作业 at Start time.
+        # Nudge it away and back so the change actually fires.
+        try:
+            box.iface_value.SetValue("")
+            time.sleep(0.4)
+        except Exception:
+            pass
+    last = None
+    for attempt in range(3):
+        try:
+            box.iface_value.SetValue(path)
+            if settle:
+                time.sleep(settle)
+            return True
+        except Exception as e:
+            last = e
+            time.sleep(2.0)
+    # fallback for a future MAA that drops ValuePattern from this control
+    with keep_focus():
+        box.click_input()
+        time.sleep(0.3)
+        from pywinauto.keyboard import send_keys
+        send_keys("^a")
+        send_keys("{DELETE}")
+        box.set_text(path)
     if settle:
         time.sleep(settle)
     return True
@@ -376,7 +413,8 @@ def wait_done(off, timeout=480, poll=4):
     while time.time() - t0 < timeout:
         txt = log_since(off)
         if ("任务出错" in txt or "战斗出错" in txt
-                or "CopilotStartFailed" in txt or "CopilotError" in txt):
+                or "CopilotStartFailed" in txt or "CopilotError" in txt
+                or "未选择作业" in txt or "读取文件失败" in txt):
             return False, txt
         if "Completed Task Chain: Copilot" in txt or "完成任务: 自动战斗" in txt:
             return True, txt
