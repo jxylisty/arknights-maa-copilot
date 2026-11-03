@@ -240,7 +240,8 @@ def stage_id_for(code):
     except Exception:
         m = {}
     if code in m:
-        return m[code]
+        # 旧缓存可能带 "#f#" 等变体后缀，统一剥掉
+        return m[code].split("#", 1)[0]
     hit = _scan_tile_pos(code)
     if hit:
         m[code] = hit
@@ -274,7 +275,8 @@ def _scan_tile_pos(code):
         except Exception:
             continue
         if d.get("code") == code and d.get("stageId"):
-            return d["stageId"]
+            # 突袭/剧情变体的 stageId 带 "#f#" 等后缀，prts 查询只认裸 id
+            return d["stageId"].split("#", 1)[0]
     return None
 
 
