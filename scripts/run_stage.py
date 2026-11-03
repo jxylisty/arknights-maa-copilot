@@ -3,6 +3,7 @@
 Usage:
     python run_stage.py VEC-09                 # rank jobs, run the best
     python run_stage.py VEC-09 --job 104031    # force a specific job id
+    python run_stage.py BI-7 --file local.json # run a local/retrofitted JSON
     python run_stage.py VEC-09 --dry           # only rank, do not run
     python run_stage.py --list                 # show the stage map
 
@@ -10,6 +11,7 @@ Assumes the game is already sitting on that stage's 开始行动 screen. Use
 `python nav.py VEC-09` to get there first.
 """
 import argparse
+import io
 import json
 import sys
 import time
@@ -32,9 +34,11 @@ def pick_job(stage_id, box, min_views=0):
 
 
 def run(job_id, name, verify=True, timeout=480, borrow=False, renames=None,
-        auto_elite=True):
-    meta = CA.fetch(job_id)
-    cop = CA.content_of(meta)
+        auto_elite=True, cop=None):
+    if cop is None:
+        meta = CA.fetch(job_id)
+        cop = CA.content_of(meta)
+    # (cop given = local/retrofitted job; job_id is then only a label)
     for pair in renames or []:
         old, _, new = pair.partition("=")
         if old and new:
@@ -92,6 +96,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("stage", nargs="?", help="VEC-09 / VEC-SP12 / act3break_08")
     ap.add_argument("--job", type=int, help="force a copilot id")
+    ap.add_argument("--file", help="run a local (e.g. retrofitted) copilot "
+                    "JSON instead of fetching a prts job")
     ap.add_argument("--dry", action="store_true", help="rank only")
     ap.add_argument("--list", action="store_true", help="print stage map")
     ap.add_argument("--timeout", type=int, default=480)
@@ -119,7 +125,15 @@ def main():
     stage_id = CA.stage_id_for(args.stage)
     box = CA.load_box()
 
-    if args.job:
+    cop = None
+    if args.file:
+        cop = json.load(io.open(args.file, encoding="utf-8"))
+        job_id = 0
+        title = f"{args.stage}_local"
+        print(f"local job {args.file}: "
+              f"ops={[o.get('name') for o in cop.get('opers', [])]} "
+              f"actions={len(cop.get('actions', []))}")
+    elif args.job:
         job_id = args.job
         title = f"{args.stage}_{job_id}"
     else:
@@ -162,7 +176,7 @@ def main():
 
     ok, info = run(job_id, title, timeout=args.timeout,
                    borrow=args.borrow, renames=args.rename,
-                   auto_elite=not args.no_auto_elite)
+                   auto_elite=not args.no_auto_elite, cop=cop)
     print("RESULT:", "CLEARED" if ok else "FAILED/NOT CLEARED")
     print(info)
     if not ok and "均未拥有" in info:

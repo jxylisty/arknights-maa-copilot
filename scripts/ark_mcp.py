@@ -208,10 +208,11 @@ def back() -> dict:
 
 @server.tool()
 def copilot_search(stage: str) -> dict:
-    """Search prts jobs for a stage code (e.g. camp_r_34, mem_lin_1),
+    """Search prts jobs for a stage code (BI-7, camp_r_34, mem_lin_1 —
+    display codes are mapped to internal ids automatically),
     ranked by feasibility against the local operator box."""
     box = CA.load_box()
-    rows = CA.search_stage(stage)
+    rows = CA.search_stage(CA.stage_id_for(stage))
     ranked = []
     for nhard, nlow, nv, r, hard, low, fillers in CA.rank(box, rows):
         ranked.append({

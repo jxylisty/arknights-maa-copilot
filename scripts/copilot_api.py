@@ -24,12 +24,13 @@ worth un-garrisoning.
 import io
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
 import urllib.request
 
-from config import OPERBOX, RARITY_FILE, STAGE_MAP
+from config import MAA_DIR, OPERBOX, RARITY_FILE, STAGE_MAP
 
 API = "https://prts.maa.plus/copilot/query"
 GET = "https://prts.maa.plus/copilot/get/{}"
@@ -226,12 +227,55 @@ def rank(box, rows):
 
 
 def stage_id_for(code):
-    """VEC-SP12 -> act3break_sp08 etc. Falls back to the code itself."""
+    """VEC-SP12 -> act3break_sp08 etc. Falls back to the code itself.
+
+    stage_map.json only covers events this skill has met; old events (BI-,
+    SN-, ...) are missing and a raw display code makes prts search return 0.
+    On a map miss, scan MAA's Arknights-Tile-Pos files for a level whose
+    display `code` matches, and write the hit back into stage_map.json so
+    the next lookup is instant.
+    """
     try:
         m = json.load(io.open(STAGE_MAP, encoding="utf-8"))
     except Exception:
-        return code
-    return m.get(code, code)
+        m = {}
+    if code in m:
+        return m[code]
+    hit = _scan_tile_pos(code)
+    if hit:
+        m[code] = hit
+        try:
+            json.dump(m, io.open(STAGE_MAP, "w", encoding="utf-8"),
+                      ensure_ascii=False, indent=1)
+        except Exception:
+            pass
+        return hit
+    return code
+
+
+def _scan_tile_pos(code):
+    """Display code -> stageId via MAA's tile-pos files.
+
+    Filenames carry the stageId but not the display code, so substring-check
+    each file for `"code": "<code>"` before paying for a full JSON parse.
+    """
+    pat = os.path.join(MAA_DIR, "resource", "Arknights-Tile-Pos", "*.json")
+    needle = re.compile(r'"code"\s*:\s*"%s"' % re.escape(code))
+    for f in os.listdir(os.path.dirname(pat)):
+        if not f.endswith(".json"):
+            continue
+        path = os.path.join(os.path.dirname(pat), f)
+        try:
+            with io.open(path, encoding="utf-8", errors="ignore") as fh:
+                raw = fh.read()
+            if not needle.search(raw):
+                continue
+            d = json.loads(raw)
+        except Exception:
+            continue
+        if d.get("code") == code and d.get("stageId"):
+            return d["stageId"]
+    return None
 
 
 # --------------------------------------------------------------------------
